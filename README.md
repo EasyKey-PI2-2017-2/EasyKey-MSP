@@ -1,2 +1,2 @@
 # EasyKey-MSP
-Códigos do MSP
+Códigos MSP430 do projeto EasyKey.
