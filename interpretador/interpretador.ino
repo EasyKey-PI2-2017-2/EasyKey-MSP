@@ -1,58 +1,68 @@
-#define LED RED_LED
-
-char string[128];
-int enable = 4;
+// Máquina de estados
+typedef enum {
+    ESPERA = 0, LEITURA, ENVIO, TERMINO
+} Estados;
+static Estados estado = ESPERA;
+String string;
+int qtd = 0;
 
 void setup() {
   Serial.begin(9600);
-  pinMode(enable,OUTPUT);
-  digitalWrite(enable,LOW);
 }
 
 void loop() {
-  // Envia vários 's'inais indicando que está pronto pra iniciar.
-  // Em python, usar a função serial.read_all() para limpar o buffer
-  //   após a comunicação inicial.
-  if (Serial.available() <= 0) {
-    Serial.print('s');
-    delay(500);
-  }
-  // Fluxo principal depois de estabelecida a comunicação.
-  else {
-    // Essa leitura será descartada. Faz parte da comunicação inicial.
-    int lixo = Serial.read();
-    
-    int qtd = 0;
-    char caracter;
-
-    while (true) {
-      // Leitura de caracter por caracter. Quando não há leitura, caracter == -1
-      caracter = Serial.read();
+  char caracter;
+  
+  switch (estado)
+  {
+    case ESPERA:
+      while(Serial.read() != 's'){
+        Serial.println("espera");
+        delay(500);
+      }
+      estado = LEITURA;
+      break;
       
-      // Se houver algum caracter, será adicionado a minha string
+    case LEITURA:
+      caracter = Serial.read();
       if (caracter > 0){
-        string[qtd] = caracter;
+        string += caracter;
         qtd++;
       }
-      // Leitura da string finalizada. Ela já possui todos os valores do Gcode.
-      //   A chamada do interpretador está aqui.
       else if (qtd > 0) {
-        string[qtd+1] = '\0';
-        interpretador();
+        string += '\0';
         qtd = 0;
+        estado = ENVIO;
       }
-    }
+      else {
+        Serial.println("leitura");
+        delay(500);
+      }
+      break;
+      
+    case ENVIO:
+      if(string.startsWith("G0")) {
+        Serial.println("envio de um G00");
+        estado = LEITURA;
+      }
+      else if(string.startsWith("G1")) {
+        Serial.println("envio de um G01");
+        estado = LEITURA;
+      }
+      else if (string.startsWith("M2")) {
+        delay(500);
+        estado = TERMINO;
+      }
+      else {
+        estado = LEITURA;
+      }
+      string = "";
+      break;
+      
+    case TERMINO:
+      Serial.println("termino");
+      delay(500);
+      estado = ESPERA;
+      break;
   }
-}
-
-// Função do interpretador. Neste momento, a variável global (seria melhor passar ela como parâmetro?)
-//   já está preenchida com a linha do Gcode que deve ser executado.
-void interpretador() {
-//  int i = 0;
-//  for (i = 0; string[i] != '\0'; i++) {
-//    Serial.write(string[i]);
-//  }
-  digitalWrite(enable,HIGH);
-  delay(5000);
-  digitalWrite(enable,LOW);
 }
