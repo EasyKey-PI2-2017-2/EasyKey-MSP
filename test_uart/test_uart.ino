@@ -2,18 +2,37 @@
 #include <legacymsp430.h>
 #include <intrinsics.h>
 
-#define RX BIT1 // Porta 1
-#define TX BIT2 // Porta 1
+#define RX            BIT1 // Porta 1
+#define TX            BIT2 // Porta 1
 
-#define BAUD_9600   0
-#define BAUD_19200  1
-#define BAUD_38400  2
-#define BAUD_56000  3
-#define BAUD_115200 4
-#define BAUD_128000 5
-#define BAUD_256000 6
-#define NUM_BAUDS   7
+#define BAUD_9600     0
+#define BAUD_19200    1
+#define BAUD_38400    2
+#define BAUD_56000    3
+#define BAUD_115200   4
+#define BAUD_128000   5
+#define BAUD_256000   6
+#define NUM_BAUDS     7
 
+//Driver 1 Nema 17
+#define ENA1          BIT5 // Porta 2
+#define ORI1          BIT4 // Porta 2
+
+//Driver 2 Nema 23
+#define ENA2          BIT0 // Porta 2
+#define ORI2          BIT1 // Porta 2
+
+//RELE
+#define RELE          BIT3 //Porta 2
+
+//Sensores
+#define CHAVE1        BIT3 // Porta 1
+#define CHAVE2        BIT6 // Porta 1
+#define CHAVE3        BIT4 // Porta 1
+#define CHAVE4        BIT7 // Porta 1
+#define SENSOR        BIT5 // Porta 1
+
+#define LED BIT0 //Porta 1
 
 // definições de funções
 void Send_Data(unsigned char c);
@@ -41,6 +60,16 @@ int main(void)
   
   BCSCTL1 = CALBC1_1MHZ;
   DCOCTL = CALDCO_1MHZ;
+  
+  P1OUT |= LED;
+  P1DIR |= LED;
+  P1DIR &= ~(CHAVE1|CHAVE2|CHAVE3|CHAVE4|SENSOR);
+  P1REN |= CHAVE1|CHAVE2|CHAVE3|CHAVE4|SENSOR;
+  P1IES |= CHAVE1|CHAVE2|CHAVE3|CHAVE4|SENSOR;
+  P1IE |= CHAVE1|CHAVE2|CHAVE3|CHAVE4;
+  
+  P2OUT |= ENA1|ORI1|ENA2|ORI2|RELE;
+  P2DIR |= ENA1|ORI1|ENA2|ORI2|RELE; 
  
   Init_UART(BAUD_9600);
   _BIS_SR(GIE);
@@ -149,8 +178,7 @@ void Init_UART(unsigned int baud_rate_choice)
   }
 }
 
-interrupt(USCIAB0RX_VECTOR) Receive_Data(void)
-{
+interrupt(USCIAB0RX_VECTOR) Receive_Data(void) {
   unsigned char c = UCA0RXBUF;
   
   if (c == 's') {
@@ -167,4 +195,19 @@ interrupt(USCIAB0RX_VECTOR) Receive_Data(void)
   else {
     string[i++] = c;
   }
+}
+
+interrupt(PORT1_VECTOR) Interrupcao_P1(void) {
+  while((P1IN&CHAVE1) == 0){
+    P1OUT &= ~LED;
+    P2OUT &= ~ENA1;                   //Desabilita o LED, o ENA1 e o ENA2
+    P2OUT &= ~ENA2;
+    P2OUT &= ~RELE;
+ }
+    P1OUT |= LED ;
+    P2OUT |= ENA1;                    //Habilita o LED, o ENA1 e o ENA2
+    P2OUT |= ENA2;
+    P2OUT |= RELE;
+      
+    P1IFG = 0x00;
 }
