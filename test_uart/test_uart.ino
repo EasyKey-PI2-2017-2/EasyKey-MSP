@@ -1,10 +1,9 @@
 #include <msp430g2553.h>
 #include <legacymsp430.h>
+#include <intrinsics.h>
 
-#define BTN BIT3
-#define RX BIT1
-#define TX BIT2
-#define LEDS (BIT0|BIT6)
+#define RX BIT1 // Porta 1
+#define TX BIT2 // Porta 1
 
 #define BAUD_9600   0
 #define BAUD_19200  1
@@ -37,19 +36,12 @@ int main(void)
 {
   static Estados estado = ESPERA;
   int qtd = 0;
-  volatile int i = 0;
-  char c;
+  
   WDTCTL = WDTPW + WDTHOLD;
   
   BCSCTL1 = CALBC1_1MHZ;
   DCOCTL = CALDCO_1MHZ;
-  
-  P1OUT = BTN;
-  P1REN |= BTN;
-  P1DIR &= ~BTN;
-  P1OUT &= ~LEDS;
-  P1DIR |= LEDS;
-
+ 
   Init_UART(BAUD_9600);
   _BIS_SR(GIE);
   
@@ -60,7 +52,6 @@ int main(void)
           Atraso(10000);
         }
         caracter = '0';
-        Send_String("esperei\n");
         estado = LEITURA;
         break;
 
@@ -68,24 +59,44 @@ int main(void)
         while (caracter != 'f') {
           Atraso(10000);
         }
-        Send_String("codigo lido\n");
-        Send_String(string);
-        Send_Data('\n');
+        caracter = '0';
         estado = ENVIO;
         break;
         
       case ENVIO:
-        while(1);
-        estado = LEITURA;
+        if (string[0] == 'M') {
+          estado = TERMINO;
+        }
+        else if (string[0] == 'G') {
+          if (string[1] == '1') {
+            Send_String("c");
+            memset(&string[0], 0, sizeof(string));
+            i = 0;
+            estado = LEITURA;
+          }
+          else {
+            Send_String("c");
+            memset(&string[0], 0, sizeof(string));
+            i = 0;
+            estado = LEITURA;
+          }
+        }
+        else {
+          Send_String("e");
+          memset(&string[0], 0, sizeof(string));
+          i = 0;
+          estado = LEITURA;
+        }
+        break;
+    
+      case TERMINO:
+        Send_String("c");
+        memset(&string[0], 0, sizeof(string));
+        i = 0;
+        Atraso(10000);
+        estado = ESPERA;
         break;
     }
-//        
-//      case TERMINO:
-//        Serial.println("termino");
-//        delay(500);
-//        estado = ESPERA;
-//        break;
-//    }
 //---------------------------
   }
   return 0;
@@ -95,35 +106,6 @@ void Send_Data(unsigned char c)
 {
   while((IFG2&UCA0TXIFG)==0);
   UCA0TXBUF = c;
-}
-
-void Send_Int(int n)
-{
-  int casa, dig;
-  if(n==0)
-  {
-    Send_Data('0');
-    return;
-  }
-  if(n<0)
-  {
-    Send_Data('-');
-    n = -n;
-  }
-  for(casa = 1; casa<=n; casa *= 10);
-  casa /= 10;
-  while(casa>0)
-  {
-    dig = (n/casa);
-    Send_Data(dig+'0');
-    n -= dig*casa;
-    casa /= 10;
-  }
-}
-
-char Read_Char(){
-  char c = 's';
-  return c;
 }
 
 void Send_String(char str[])
