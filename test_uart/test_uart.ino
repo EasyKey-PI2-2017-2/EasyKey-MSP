@@ -35,12 +35,15 @@
 #define LED BIT0 //Porta 1
 
 // definições de funções
+void movea(float xval, float yval);
+void mover(float x, float y);
+void feedrate(int feed);
+float atof(char * ptr);
 void Send_Data(unsigned char c);
 void Send_Int(int n);
 void Send_String(char str[]);
 void Atraso(volatile unsigned int x);
 void Init_UART(unsigned int baud_rate_choice);
-
 
 // variáveis globais
 typedef enum {
@@ -49,12 +52,16 @@ typedef enum {
 unsigned char caracter = '0';
 char string[128];
 int i = 0;
+int x_pos = 0;
+int y_pos = 0;
 
 
 int main(void)
 {
   static Estados estado = ESPERA;
   int qtd = 0;
+  char * ptr;
+  float xval, yval;
   
   WDTCTL = WDTPW + WDTHOLD;
   
@@ -97,13 +104,24 @@ int main(void)
           estado = TERMINO;
         }
         else if (string[0] == 'G') {
+          char * ptr = strtok(string," ");
+          
+          ptr = strtok(NULL," ");
+          xval = atof(ptr+1);
+          ptr = strtok(NULL," ");
+          yval = atof(ptr+1);
+          
           if (string[1] == '1') {
+            mover(xval, yval);
+            
             Send_String("c");
             memset(&string[0], 0, sizeof(string));
             i = 0;
             estado = LEITURA;
           }
           else {
+            mover(xval, yval);
+            
             Send_String("c");
             memset(&string[0], 0, sizeof(string));
             i = 0;
@@ -126,10 +144,111 @@ int main(void)
         estado = ESPERA;
         break;
     }
-//---------------------------
   }
   return 0;
 }
+
+
+// ------------------------------------------- //
+// FUNCOES DO INTERPRETADOR                    //
+// ------------------------------------------- //
+
+void movea(float xval,float yval){
+  int dx = xval - x_pos;
+  int dy = yval - y_pos;
+  mover(dx, dy);
+}
+
+
+void mover(float x, float y){
+  short dirx = x / abs(x);
+  short diry = y / abs(y);
+  x = abs(x);
+  y = abs(y);
+  if(x == y){
+    for(int i = 0; i < x; i++){
+      //stepperx.step(dirx * (-1));
+      x_pos += dirx;
+      //steppery.step(diry);
+      y_pos += diry;
+    }
+  }else if(x > y){
+    float acc = 0;
+    boolean flag = false;
+    for(int i = 0; i < x; i++){
+      //stepperx.step(dirx * (-1));
+      x_pos += dirx;
+      if(flag){
+        //steppery.step(diry);
+        y_pos += diry;
+        flag = false;
+      }
+      acc += y / x;
+      if(acc > 0.5){
+        flag = true;
+        acc--;
+      }
+    }    
+  }else{
+    float acc = 0;
+    boolean flag = false;
+    for(int i = 0; i < y; i++){
+      //steppery.step(diry);
+      y_pos += diry;
+      if(flag){
+        //stepperx.step(dirx * (-1));
+        x_pos += dirx;
+        flag = false;
+      }
+      acc += x / y;
+      if(acc > 0.5){
+        flag = true;
+        acc--;
+      }
+    }
+  }
+}
+
+void feedrate(int feed) {
+  
+}
+
+float atof(char * ptr){
+  float x = 0;
+  float i = 10;
+  boolean flag = false;
+  boolean m = false;
+  while(*ptr != '\0'){
+    if(flag){
+      if(*ptr < 48 || *ptr > 57){
+        ptr++;
+        continue;
+      }
+      x += (*ptr - 48) / i;
+      i*=10;
+    }else{
+      if(*ptr == 46)
+        flag = true;
+      if(*ptr == 45)
+        m = true;
+      if(*ptr < 48 || *ptr > 57){
+        ptr++;
+        continue;
+      }
+      x *= 10;
+      x += (*ptr - 48);
+    }
+    ptr++;
+  }
+  if(m)
+    x *= (-1);
+  return x;
+}
+
+
+// ------------------------------------------- //
+// COMUNICAO SERIAL                            //
+// ------------------------------------------- //
 
 void Send_Data(unsigned char c)
 {
@@ -196,6 +315,11 @@ interrupt(USCIAB0RX_VECTOR) Receive_Data(void) {
     string[i++] = c;
   }
 }
+
+
+// ------------------------------------------- //
+// INTERRUPCOES                                //
+// ------------------------------------------- //
 
 interrupt(PORT1_VECTOR) Interrupcao_P1(void) {
   while((P1IN&CHAVE1) == 0){
