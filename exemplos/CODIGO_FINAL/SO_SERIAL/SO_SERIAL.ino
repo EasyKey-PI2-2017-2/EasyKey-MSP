@@ -14,29 +14,23 @@
 #define BAUD_256000   6
 #define NUM_BAUDS     7
 
-#define CLK1           BIT6 // Porta 1.6  //----------------------------//
-                                         //Fazer curto nessas portas (Mesmo CLK)--//
-#define CLK2          BIT0 // Porta 2.0  //--------------------------//
-
-//Driver 1 Nema 17 
-#define ORI1          BIT5 // Porta 2.5
-#define ENA1          BIT4 // Porta 2.4
+//Driver 1 Nema 17
+#define ENA1          BIT5 // Porta 2
+#define ORI1          BIT4 // Porta 2
 
 //Driver 2 Nema 23
-#define ORI2          BIT1 // Porta 2.1
-#define ENA2          BIT2 // Porta 2.2
+#define ENA2          BIT0 // Porta 2
+#define ORI2          BIT1 // Porta 2
 
 //RELE
-#define RELE          BIT3 //Porta 2.3
+#define RELE          BIT3 //Porta 2
 
 //Sensores
-#define CHAVE1        BIT3 // Porta 1.3 -- Porta da chave 1 ( Eixo do Nema 17)
-#define CHAVE2        BIT4 // Porta 1.4 -- Porta da chave 2  (Eixo do Nema 23 - G0)
-#define CHAVE3        BIT7 // Porta 1.7 -- Porta da chave 3 ( Eixo do Nema 23 - Final) 
-#define SENSOR        BIT5 // Porta 1.5 -- Porta do sensor infravermelho
-
-
-
+#define CHAVE1        BIT3 // Porta 1
+#define CHAVE2        BIT6 // Porta 1
+#define CHAVE3        BIT4 // Porta 1
+#define CHAVE4        BIT7 // Porta 1
+#define SENSOR        BIT5 // Porta 1
 
 #define LED BIT0 //Porta 1
 
@@ -73,30 +67,16 @@ int main(void)
   
   BCSCTL1 = CALBC1_1MHZ;
   DCOCTL = CALDCO_1MHZ;
-
-  //Timer_A em modo up, com 10000 contagens de 1us,
- //gerando uma interrupção a cada 10 ms (10000*(1/1MHz) = 10ms)
-
- TACCR0 = 50000-1; //PERÍODO DO PWM
- TACCTL1 = OUTMOD_7; //MODO DE SAdÍDA DO TIMER0_A: RESET/SET
- TACCR1 = TACCR0/2; //DUTY CYCLE DO PWM EM 50%
- TACTL = TASSEL_2 + ID_1 + MC_1; //TASSEL_2 -> CLOCK SOURCE: MCLK  MC_1 ->                           //TIMER COM CONTAGEM PROGRESSIVA DE 0 ATÉ TACCR1
-
-  P1IFG = 0x00;
-  P1DIR |= LED|CLK1;
-  P1OUT |= LED;
-  P1SEL |= CLK1|RX|TX;
-  P1SEL2|= RX|TX;
-  P1DIR &= ~(CHAVE1|CHAVE2|CHAVE3|SENSOR);
-  P1REN |= (CHAVE1|CHAVE2|CHAVE3|SENSOR);
-  P1IES |= (CHAVE1|CHAVE2|CHAVE3|SENSOR);
-  P1IE |= (CHAVE1|CHAVE2|CHAVE3|SENSOR);
-
-  P2DIR |= ENA1|ORI1|ENA2|ORI2|RELE;
-  //P2DIR &= CLK2;
-  P2OUT |= ENA1|ORI1|ENA2|ORI2|RELE;
   
-   
+  P1OUT |= LED;
+  P1DIR |= LED;
+  P1DIR &= ~(CHAVE1|CHAVE2|CHAVE3|CHAVE4|SENSOR);
+  P1REN |= CHAVE1|CHAVE2|CHAVE3|CHAVE4|SENSOR;
+  P1IES |= CHAVE1|CHAVE2|CHAVE3|CHAVE4|SENSOR;
+  P1IE |= CHAVE1|CHAVE2|CHAVE3|CHAVE4;
+  
+  P2OUT |= ENA1|ORI1|ENA2|ORI2|RELE;
+  P2DIR |= ENA1|ORI1|ENA2|ORI2|RELE; 
  
   Init_UART(BAUD_9600);
   _BIS_SR(GIE);
@@ -301,7 +281,7 @@ void Init_UART(unsigned int baud_rate_choice)
   if(baud_rate_choice<NUM_BAUDS)
   {
     // Habilita os pinos para transmissao serial UART
-    //P1SEL2 = P1SEL = RX+TX;
+    P1SEL2 = P1SEL = RX+TX;
     // Configura a transmissao serial UART com 8 bits de dados,
     // sem paridade, comecando pelo bit menos significativo,
     // e com um bit de STOP
@@ -348,7 +328,6 @@ interrupt(PORT1_VECTOR) Interrupcao_P1(void) {
     P2OUT &= ~ENA2;
     P2OUT &= ~RELE;
  }
-
     P1OUT |= LED ;
     P2OUT |= ENA1;                    //Habilita o LED, o ENA1 e o ENA2
     P2OUT |= ENA2;
