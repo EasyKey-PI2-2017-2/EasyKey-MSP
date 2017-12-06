@@ -14,7 +14,8 @@
 #define BAUD_256000   6
 #define NUM_BAUDS     7
 
-#define CLK1           BIT6 // Porta 1.6  //----------------------------//
+//CLOCK
+#define CLK1          BIT6 // Porta 1.6  //----------------------------//
                                          //Fazer curto nessas portas (Mesmo CLK)--//
 #define CLK2          BIT0 // Porta 2.0  //--------------------------//
 
@@ -35,16 +36,13 @@
 #define CHAVE3        BIT7 // Porta 1.7 -- Porta da chave 3 ( Eixo do Nema 23 - Final) 
 #define SENSOR        BIT5 // Porta 1.5 -- Porta do sensor infravermelho
 
-
-
-
 #define LED BIT0 //Porta 1
 
-// definições de funções
-void movea(float xval, float yval);
-void mover(float x, float y);
+/// definições de funções
+void movea(double xval, double yval);
+void mover(double x, double y);
 void feedrate(int feed);
-float atof(char * ptr);
+double atof(char * ptr);
 void Send_Data(unsigned char c);
 void Send_Int(int n);
 void Send_String(char str[]);
@@ -67,7 +65,7 @@ int main(void)
   static Estados estado = ESPERA;
   int qtd = 0;
   char * ptr;
-  float xval, yval;
+  double xval, yval;
   
   WDTCTL = WDTPW + WDTHOLD;
   
@@ -76,11 +74,12 @@ int main(void)
 
   //Timer_A em modo up, com 10000 contagens de 1us,
  //gerando uma interrupção a cada 10 ms (10000*(1/1MHz) = 10ms)
+ // Fórmula geral -> (TACCR0*(1/1MHz) = f(out)
 
- TACCR0 = 50000-1; //PERÍODO DO PWM
+ TACCR0 = 25000-1; //PERÍODO DO PWM
  TACCTL1 = OUTMOD_7; //MODO DE SAdÍDA DO TIMER0_A: RESET/SET
  TACCR1 = TACCR0/2; //DUTY CYCLE DO PWM EM 50%
- TACTL = TASSEL_2 + ID_1 + MC_1; //TASSEL_2 -> CLOCK SOURCE: MCLK  MC_1 ->                           //TIMER COM CONTAGEM PROGRESSIVA DE 0 ATÉ TACCR1
+ TACTL = TASSEL_2 + ID_1 + MC_1; //TASSEL_2 -> CLOCK SOURCE: MCLK  MC_1 ->   //TIMER COM CONTAGEM PROGRESSIVA DE 0 ATÉ TACCR1
 
   P1IFG = 0x00;
   P1DIR |= LED|CLK1;
@@ -93,10 +92,8 @@ int main(void)
   P1IE |= (CHAVE1|CHAVE2|CHAVE3|SENSOR);
 
   P2DIR |= ENA1|ORI1|ENA2|ORI2|RELE;
-  //P2DIR &= CLK2;
+  //P2DIR &= ~CLK2;
   P2OUT |= ENA1|ORI1|ENA2|ORI2|RELE;
-  
-   
  
   Init_UART(BAUD_9600);
   _BIS_SR(GIE);
@@ -173,14 +170,13 @@ int main(void)
 // FUNCOES DO INTERPRETADOR                    //
 // ------------------------------------------- //
 
-void movea(float xval,float yval){
+void movea(double xval,double yval){
   int dx = xval - x_pos;
   int dy = yval - y_pos;
   mover(dx, dy);
 }
 
-
-void mover(float x, float y){
+void mover(double x, double y){
   short dirx = x / abs(x);
   short diry = y / abs(y);
   x = abs(x);
@@ -193,7 +189,7 @@ void mover(float x, float y){
       y_pos += diry;
     }
   }else if(x > y){
-    float acc = 0;
+    double acc = 0;
     boolean flag = false;
     for(int i = 0; i < x; i++){
       //stepperx.step(dirx * (-1));
@@ -210,12 +206,13 @@ void mover(float x, float y){
       }
     }    
   }else{
-    float acc = 0;
+    double acc = 0;
     boolean flag = false;
+    
     for(int i = 0; i < y; i++){
       //steppery.step(diry);
       y_pos += diry;
-      if(flag){
+       if(flag){
         //stepperx.step(dirx * (-1));
         x_pos += dirx;
         flag = false;
@@ -233,9 +230,9 @@ void feedrate(int feed) {
   
 }
 
-float atof(char * ptr){
-  float x = 0;
-  float i = 10;
+double atof(char * ptr){
+  double x = 0;
+  double i = 10;
   boolean flag = false;
   boolean m = false;
   while(*ptr != '\0'){
@@ -264,7 +261,6 @@ float atof(char * ptr){
     x *= (-1);
   return x;
 }
-
 
 // ------------------------------------------- //
 // COMUNICAO SERIAL                            //
@@ -336,10 +332,9 @@ interrupt(USCIAB0RX_VECTOR) Receive_Data(void) {
   }
 }
 
-
 // ------------------------------------------- //
 // INTERRUPCOES                                //
-// ------------------------------------------- //
+// D------------------------------------------- //
 
 interrupt(PORT1_VECTOR) Interrupcao_P1(void) {
   while((P1IN&CHAVE1) == 0){
@@ -347,7 +342,25 @@ interrupt(PORT1_VECTOR) Interrupcao_P1(void) {
     P2OUT &= ~ENA1;                   //Desabilita o LED, o ENA1 e o ENA2
     P2OUT &= ~ENA2;
     P2OUT &= ~RELE;
- }
+  }
+   while((P1IN&CHAVE2) == 0){
+    P1OUT &= ~LED;
+    P2OUT &= ~ENA1;                   //Desabilita o LED, o ENA1 e o ENA2
+    P2OUT &= ~ENA2;
+    P2OUT &= ~RELE;
+  }
+   while((P1IN&CHAVE3) == 0){
+    P1OUT &= ~LED;
+    P2OUT &= ~ENA1;                   //Desabilita o LED, o ENA1 e o ENA2
+    P2OUT &= ~ENA2;
+    P2OUT &= ~RELE;
+  }
+   while((P1IN&SENSOR) == 0){
+    P1OUT &= ~LED;
+    P2OUT &= ~ENA1;                   //Desabilita o LED, o ENA1 e o ENA2
+    P2OUT &= ~ENA2;
+    P2OUT &= ~RELE;
+  }
 
     P1OUT |= LED ;
     P2OUT |= ENA1;                    //Habilita o LED, o ENA1 e o ENA2
