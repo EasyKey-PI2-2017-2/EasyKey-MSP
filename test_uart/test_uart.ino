@@ -2,6 +2,7 @@
 #include <legacymsp430.h>
 #include <intrinsics.h>
 
+
 #define RX            BIT1 // Porta 1
 #define TX            BIT2 // Porta 1
 
@@ -33,7 +34,6 @@
 //Sensores
 #define CHAVE1        BIT3 // Porta 1.3 -- Porta da chave 1 ( Eixo do Nema 17)
 #define CHAVE2        BIT4 // Porta 1.4 -- Porta da chave 2  (Eixo do Nema 23 - G0)
-#define CHAVE3        BIT7 // Porta 1.7 -- Porta da chave 3 ( Eixo do Nema 23 - Final) 
 #define SENSOR        BIT5 // Porta 1.5 -- Porta do sensor infravermelho
 
 #define LED BIT0 //Porta 1
@@ -76,7 +76,7 @@ int main(void)
  //gerando uma interrupção a cada 10 ms (10000*(1/1MHz) = 10ms)
  // Fórmula geral -> (TACCR0*(1/1MHz) = f(out)
 
- TACCR0 = 25000-1; //PERÍODO DO PWM
+ TACCR0 = 1000-1; //PERÍODO DO PWM
  TACCTL1 = OUTMOD_7; //MODO DE SAdÍDA DO TIMER0_A: RESET/SET
  TACCR1 = TACCR0/2; //DUTY CYCLE DO PWM EM 50%
  TACTL = TASSEL_2 + ID_1 + MC_1; //TASSEL_2 -> CLOCK SOURCE: MCLK  MC_1 ->   //TIMER COM CONTAGEM PROGRESSIVA DE 0 ATÉ TACCR1
@@ -86,14 +86,14 @@ int main(void)
   P1OUT |= LED;
   P1SEL |= CLK1|RX|TX;
   P1SEL2|= RX|TX;
-  P1DIR &= ~(CHAVE1|CHAVE2|CHAVE3|SENSOR);
-  P1REN |= (CHAVE1|CHAVE2|CHAVE3|SENSOR);
-  P1IES |= (CHAVE1|CHAVE2|CHAVE3|SENSOR);
-  P1IE |= (CHAVE1|CHAVE2|CHAVE3|SENSOR);
+  P1DIR &= ~(CHAVE1|CHAVE2|SENSOR);
+  P1REN |= (CHAVE1|CHAVE2|SENSOR);
+  P1IES |= (CHAVE1|CHAVE2|SENSOR);
+  P1IE |= (CHAVE1|CHAVE2|SENSOR);
 
   P2DIR |= ENA1|ORI1|ENA2|ORI2|RELE;
   //P2DIR &= ~CLK2;
-  P2OUT |= ENA1|ORI1|ENA2|ORI2|RELE;
+  P2OUT &= ~(ENA1|ENA2);  
  
   Init_UART(BAUD_9600);
   _BIS_SR(GIE);
@@ -157,6 +157,8 @@ int main(void)
         Send_String("c");
         memset(&string[0], 0, sizeof(string));
         i = 0;
+        P2OUT |= (ORI1|ENA1|ENA2);
+        P2OUT &= ~(ORI2|RELE);
         Atraso(10000);
         estado = ESPERA;
         break;
@@ -336,36 +338,31 @@ interrupt(USCIAB0RX_VECTOR) Receive_Data(void) {
 // INTERRUPCOES                                //
 // D------------------------------------------- //
 
+//ORI1 |= vai pra chave
+//ORI2 &= vai pra chave 
 interrupt(PORT1_VECTOR) Interrupcao_P1(void) {
-  while((P1IN&CHAVE1) == 0){
+  
+  if((P1IN&CHAVE1) == 0){          // NEMA 17
+    Atraso(10000);
     P1OUT &= ~LED;
-    P2OUT &= ~ENA1;                   //Desabilita o LED, o ENA1 e o ENA2
+    P2OUT ^= ORI1;
+    __delay_cycles(1000000);
+    P2OUT &= ~ENA1;
+    P2OUT &= ~RELE;
+  }
+  if((P1IN&CHAVE2) == 0){         // G0 do NEMA 23
+    Atraso(10000);
+    P1OUT &= ~LED;
+    P2OUT ^= ORI2;
+    __delay_cycles(1000000);
     P2OUT &= ~ENA2;
     P2OUT &= ~RELE;
   }
-   while((P1IN&CHAVE2) == 0){
+  if((P1IN&SENSOR) == 0){
     P1OUT &= ~LED;
-    P2OUT &= ~ENA1;                   //Desabilita o LED, o ENA1 e o ENA2
+    P2OUT &= ~ENA1;                   // Desabilita o LED, o ENA1 e o ENA2
     P2OUT &= ~ENA2;
     P2OUT &= ~RELE;
   }
-   while((P1IN&CHAVE3) == 0){
-    P1OUT &= ~LED;
-    P2OUT &= ~ENA1;                   //Desabilita o LED, o ENA1 e o ENA2
-    P2OUT &= ~ENA2;
-    P2OUT &= ~RELE;
-  }
-   while((P1IN&SENSOR) == 0){
-    P1OUT &= ~LED;
-    P2OUT &= ~ENA1;                   //Desabilita o LED, o ENA1 e o ENA2
-    P2OUT &= ~ENA2;
-    P2OUT &= ~RELE;
-  }
-
-    P1OUT |= LED ;
-    P2OUT |= ENA1;                    //Habilita o LED, o ENA1 e o ENA2
-    P2OUT |= ENA2;
-    P2OUT |= RELE;
-      
     P1IFG = 0x00;
 }
